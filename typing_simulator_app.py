@@ -22,8 +22,8 @@ class TypingSimulatorApp(tk.Tk):
         super().__init__()
 
         self.title("Typing Simulator")
-        self.geometry("1180x760")
-        self.minsize(860, 560)
+        self.geometry("430x650+0+100")
+        self.minsize(390, 560)
 
         # Runtime typing state. `position` tracks the next source character
         self.source_text = ""
@@ -38,6 +38,9 @@ class TypingSimulatorApp(tk.Tk):
         self._build_style()
         self._build_ui()
         self._update_metrics()
+
+        self.target_x = 643
+        self.target_y = 336
 
     def _build_style(self) -> None:
         """Configure ttk colors, fonts, and button styles."""
@@ -62,7 +65,7 @@ class TypingSimulatorApp(tk.Tk):
     def _build_ui(self) -> None:
         """Create the header, controls panel, metrics panel, and preview area."""
 
-        # Top bar with the app name and current typing status.
+        # Top bar with the app name.
         header = ttk.Frame(self, padding=(18, 14, 18, 10))
         header.grid(row=0, column=0, sticky="ew")
         header.columnconfigure(1, weight=1)
@@ -78,20 +81,21 @@ class TypingSimulatorApp(tk.Tk):
         )
         mark.grid(row=0, column=0, padx=(0, 10))
         ttk.Label(header, text="Typing Simulator", style="Title.TLabel").grid(row=0, column=1, sticky="w")
-        self.status_label = ttk.Label(header, text="Ready", foreground="#5d6b7a")
-        self.status_label.grid(row=0, column=2, sticky="e")
 
         body = ttk.Frame(self, padding=(18, 8, 18, 18))
         body.grid(row=1, column=0, sticky="nsew")
-        body.columnconfigure(0, minsize=330)
-        body.columnconfigure(1, weight=1)
+
+        # Only one column now
+        body.columnconfigure(0, weight=1)
         body.rowconfigure(0, weight=1)
+
         self.rowconfigure(1, weight=1)
         self.columnconfigure(0, weight=1)
 
         # Left side: input text, timing controls, and action buttons.
         left = ttk.Frame(body)
-        left.grid(row=0, column=0, sticky="nsew", padx=(0, 16))
+        left.grid(row=0, column=0, sticky="nsew")
+        left.columnconfigure(0, weight=1)
         left.rowconfigure(1, weight=1)
 
         controls = ttk.Frame(left, style="Panel.TFrame", padding=14)
@@ -172,37 +176,6 @@ class TypingSimulatorApp(tk.Tk):
         ttk.Label(metrics, text="left", style="Muted.TLabel").grid(row=1, column=1, sticky="w")
         ttk.Label(metrics, text="elapsed", style="Muted.TLabel").grid(row=1, column=2, sticky="w")
 
-        # Right side: a simple toolbar for the document-editor look, followed
-        right = ttk.Frame(body)
-        right.grid(row=0, column=1, sticky="nsew")
-        right.rowconfigure(1, weight=1)
-        right.columnconfigure(0, weight=1)
-
-        toolbar = ttk.Frame(right, style="Panel.TFrame", padding=(10, 8))
-        toolbar.grid(row=0, column=0, sticky="ew", pady=(0, 12))
-        for index, label in enumerate(("A", "B", "I", "=", "-", "+")):
-            ttk.Label(toolbar, text=label, style="Panel.TLabel", font=("Segoe UI", 10, "bold")).grid(row=0, column=index, padx=10)
-
-        # preview_frame = tk.Frame(right, bg="#e9edf2", highlightthickness=1, highlightbackground="#d9e0e7")
-        # preview_frame.grid(row=1, column=0, sticky="nsew")
-        # preview_frame.columnconfigure(0, weight=1)
-        # preview_frame.rowconfigure(0, weight=1)
-        #
-        # self.preview = ScrolledText(
-        #     preview_frame,
-        #     wrap="word",
-        #     font=("Arial", 12),
-        #     bg="#ffffff",
-        #     fg="#1f2937",
-        #     relief="flat",
-        #     borderwidth=0,
-        #     padx=72,
-        #     pady=58,
-        #     undo=False,
-        # )
-        # self.preview.grid(row=0, column=0, sticky="nsew", padx=36, pady=22)
-        # self.preview.configure(state="disabled")
-
     def _on_scale_change(self, _value: str) -> None:
         """Keep the WPM slider value inside the supported range."""
 
@@ -229,25 +202,6 @@ class TypingSimulatorApp(tk.Tk):
         self.running = running
         self.start_button.configure(state="disabled" if running else "normal")
         self.stop_button.configure(state="normal" if running else "disabled")
-        if running:
-            self.status_label.configure(text="Typing")
-        elif self.source_text and self.position >= len(self.source_text):
-            self.status_label.configure(text="Finished")
-        else:
-            self.status_label.configure(text="Ready")
-
-    # def _set_preview_state(self, state: str) -> None:
-    #     """Temporarily unlock or lock the preview text widget."""
-    #
-    #     self.preview.configure(state=state)
-
-    def _append_preview(self, char: str) -> None:
-        """Append one character to the preview and keep the cursor in view."""
-
-        self._set_preview_state("normal")
-        self.preview.insert("end", char)
-        self.preview.see("end")
-        self._set_preview_state("disabled")
 
     # def _delete_last_preview_char(self) -> None:
     #     """Remove the most recently displayed character for typo correction."""
@@ -328,14 +282,9 @@ class TypingSimulatorApp(tk.Tk):
         if self.position >= len(self.source_text):
             self.source_text = self.input_box.get("1.0", "end-1c")
             self.position = 0
-            self._clear_preview()
 
         if not self.source_text:
             self.source_text = self.input_box.get("1.0", "end-1c")
-
-        if not self.source_text.strip():
-            self.status_label.configure(text="Add text first")
-            return
 
         if self.position == 0:
             self.started_at = time.monotonic()
@@ -343,7 +292,9 @@ class TypingSimulatorApp(tk.Tk):
         self._set_running(True)
         self._update_metrics()
         self._tick_elapsed()
-        self._type_next()
+
+        # Wait 2 seconds, then click the document and start typing
+        self.after(2000, self._focus_document_and_type)
 
     def stop_typing(self) -> None:
         """Pause the current run and cancel pending scheduled callbacks."""
@@ -357,6 +308,23 @@ class TypingSimulatorApp(tk.Tk):
         self._set_running(False)
         self._update_metrics()
 
+    def _focus_document_and_type(self) -> None:
+        """Click the document area, move to the end, then begin typing."""
+
+        if not self.running:
+            return
+
+        time.sleep(0.3)
+
+        pyautogui.click(self.target_x, self.target_y)
+        time.sleep(0.2)
+
+        # Move cursor to the end of the Google Doc
+        pyautogui.hotkey("ctrl", "end")
+        time.sleep(0.2)
+
+        self._type_next()
+
     def reset_output(self) -> None:
         """Clear the preview and reset counters to the current input text."""
 
@@ -365,51 +333,41 @@ class TypingSimulatorApp(tk.Tk):
         self.position = 0
         self.started_at = 0.0
         self.typo_cleanup = False
-        # self._clear_preview()
         self.elapsed_value.configure(text="0s")
-        self.status_label.configure(text="Ready")
         self._update_metrics()
 
-    # def _clear_preview(self) -> None:
-    #     """Remove all displayed preview text."""
-    #
-    #     self._set_preview_state("normal")
-    #     self.preview.delete("1.0", "end")
-    #     self._set_preview_state("disabled")
-
     def _type_next(self) -> None:
-        """Display the next character, then schedule the following tick."""
+        """Type the next character into the active window, then schedule the following tick."""
 
         if not self.running:
             return
 
-        # A typo is shown first, then this branch deletes it before the real
-        # character is typed on the next pass.
         if self.typo_cleanup:
-            # self._delete_last_preview_char()
+            pyautogui.press("backspace")
             self.typo_cleanup = False
             self.timer_id = self.after(random.randint(70, 170), self._type_next)
             return
 
         if self.position >= len(self.source_text):
             self.stop_typing()
-            self.status_label.configure(text="Finished")
             return
 
         char = self.source_text[self.position]
         previous_char = self.source_text[self.position - 1] if self.position > 0 else ""
 
-        # Optional typo mode inserts a wrong letter, then schedules a quick
-        # correction before advancing the source-text position.
         if self.typos_var.get() and char.isalpha() and random.random() < 0.012:
             wrong_char = self._nearby_typo(char)
             if wrong_char:
-                self._append_preview(wrong_char)
+                pyautogui.write(wrong_char)
                 self.typo_cleanup = True
                 self.timer_id = self.after(random.randint(120, 280), self._type_next)
                 return
 
-        self._append_preview(char)
+        if char == "\n":
+            pyautogui.press("enter")
+        else:
+            pyautogui.write(char)
+
         self.position += 1
         self._update_metrics()
         self.timer_id = self.after(self._delay_for(char, previous_char), self._type_next)
